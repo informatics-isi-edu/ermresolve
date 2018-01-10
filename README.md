@@ -206,7 +206,7 @@ named tables and find entities cited by their immutable `RID` key:
       {
         "catalog": 1,
         "column": "RID",
-		"schema": "My Schema",
+        "schema": "My Schema",
         "tables": [
           "table 1",
           "table 2"
