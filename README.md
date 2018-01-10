@@ -55,9 +55,9 @@ experience related to citable data:
 The final redirected URL may be content-negotiated:
 
 1. For clients requesting HTML, a Chaise GUI application URL is
-   supplied.
+   supplied, e.g. `https://example.com/chaise/#1/Schema:Table/RID=1-X140`.
 2. For clients requesting JSON or CSV data, a raw ERMrest data URL is
-   supplied.
+   supplied, e.g. `https://example.com/ermrest/catalog/1/Schema:Table/RID=1-X140`.
 
 ## Deploying ERMresolve
 
