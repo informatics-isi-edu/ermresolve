@@ -178,7 +178,7 @@ mixing notations:
 
 If multiple notations are combined, they are implicitly ordered as per
 this table. The ERMresolve service does not attempt to preserve or
-intepret the JSON document order of the configuration document!
+intepret the JSON document order of the configuration object's fields!
 
 Each case above is only activated if **all** sources in that row are
 properly configured. However, if `patterns` is absent in the object, a
