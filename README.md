@@ -68,7 +68,7 @@ ERMrest service via the `localhost` loopback interface.
 
 ### Prerequisites
 
-The essential ERMrest prerequisite also satisfies the other
+The essential ERMrest prerequisite also satisfies most of the other
 third-party prerequisites since they share common implementation
 techniques.
 
@@ -76,6 +76,7 @@ techniques.
 - Apache HTTPD
 - mod_wsgi
 - web.py lightweight web framework
+- Chaise web UI at `/chaise/` path
 
 ### Planning the Deployment
 
@@ -169,7 +170,7 @@ mixing notations:
 | Sugar format                   | Pattern    | Catalog   | Schema   | Table   | Column   |
 |--------------------------------|------------|-----------|----------|---------|----------|
 | no sugar                       | `patterns` | `catalog` | `schema` | `table` | `column` |
-| `tables`                       | `patterns` | `catalog` | `schema` | 1-tuple | `column` |
+| `tables`                       | `patterns` | `catalog` | `schema` | list element | `column` |
 | `table_columns`                | `patterns` | `catalog` | `schema` | 2-tuple | 2-tuple  |
 | `schema_tables`                | `patterns` | `catalog` | 2-tuple  | 2-tuple | `column` |
 | `schema_table_columns`         | `patterns` | `catalog` | 3-tuple  | 3-tuple | 3-tuple  |
