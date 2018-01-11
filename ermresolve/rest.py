@@ -72,7 +72,7 @@ class Resolver (object):
                             else:
                                 raise web.seeother(ermrest_url)
 
-                    web.debug('ERMresolve %s did not produce a result' % ermrest_url)
+                #web.debug('ERMresolve %s did not produce a result' % ermrest_url)
 
         if syntax_matched:
             raise NotFound(web.ctx.env['REQUEST_URI'])
