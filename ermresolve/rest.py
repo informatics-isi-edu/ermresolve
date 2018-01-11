@@ -23,6 +23,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
+_config = get_service_config()
+
 _session = requests.session()
 _retries = Retry(
     connect=5,
@@ -30,41 +32,42 @@ _retries = Retry(
     backoff_factor=1.0,
     status_forcelist=[500, 502, 503, 504]
 )
-_session.mount('https://localhost', HTTPAdapter(max_retries=_retries))
+
+_session.mount('http://', HTTPAdapter(max_retries=_retries))
+_session.mount('https://', HTTPAdapter(max_retries=_retries))
 
 class Resolver (object):
     """Implements ERMresolve REST API as a web.py request handler.
 
     """
-    config = get_service_config()
-    
     def GET(self, url_id_part):
         """Resolve url_id_part and redirect client to current GUI or data URL."""
         syntax_matched = False
 
         # search in order for syntax match
-        for target in self.config.targets:
+        for target in _config.targets:
             parts = target.match_parts(url_id_part)
             if parts:
                 syntax_matched = True
 
                 # see if this target is the right one in ERMrest
-                ermrest_path = (target.ermrest_url_template % parts)
-                resp = _session.get(
-                    'https://localhost' + ermrest_path,
-                    headers={"Accept": "application/json"}
-                )
-                if resp.status == 200:
-                    rows = resp.json()
-                    resp.close()
-                    if rows:
-                        assert len(rows) == 1, "resolution should never find multiple rows"
-                        # TODO: handle content negotiation for GUI
-                        raise web.seeother(ermrest_path)
+                ermrest_url = (target.ermrest_url_template % parts)
+                with _session.get(
+                        ermrest_url,
+                        headers={"Accept": "application/json"}
+                ) as resp:
+                    rows = None
+                    if resp.status_code == 200:
+                        rows = resp.json()
+                        if rows:
+                            assert len(rows) == 1, "resolution should never find multiple rows"
+                            raise web.seeother(ermrest_url)
+
+                    web.debug('ERMresolve %s did not produce a result' % ermrest_url)
 
         if syntax_matched:
-            raise NotFound(url_id_part)
+            raise NotFound(web.ctx.env['REQUEST_URI'])
         else:
             raise BadRequest('Key "%s" is not a recognized ID format.' % url_id_part)
 
-urls = ('.*', Resolver)
+urls = ('/(.*)', Resolver)

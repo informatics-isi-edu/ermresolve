@@ -23,37 +23,37 @@ class TestConfig1 (unittest.TestCase):
     def test_no_sugar_simple(self):
         self.assertTupleEqual(
             _config1.targets[0].astuple()[1:],
-            (1, "S1", "T1", "c1")
+            ("http://localhost", 1, "S1", "T1", "c1")
         )
 
     def test_no_sugar_embedded(self):
         self.assertTupleEqual(
             _config1.targets[11].astuple()[1:],
-            (7, "S7", "T7", "c7")
+            ("http://localhost", 7, "S7", "T7", "c7")
         )
 
     def test_match_unversioned(self):
         parts = _config1.targets[0].match_parts('1-2RW0')
-        self.assertEqual(parts, {"catalog": '1', "schema": "S1", "table": "T1", "column": "c1", "key": '1-2RW0'})
+        self.assertEqual(parts, {"server_url": "http://localhost", "catalog": '1', "schema": "S1", "table": "T1", "column": "c1", "key": '1-2RW0'})
         self.assertEqual(
             _config1.targets[0].ermrest_url_template % parts,
-            '/ermrest/catalog/1/entity/S1:T1/c1=1-2RW0'
+            'http://localhost/ermrest/catalog/1/entity/S1:T1/c1=1-2RW0'
         )
         self.assertEqual(
             _config1.targets[0].chaise_url_template % parts,
-            '/chaise/record/#1/S1:T1/c1=1-2RW0'
+            'http://localhost/chaise/record/#1/S1:T1/c1=1-2RW0'
         )
 
     def test_match_versioned(self):
         parts = _config1.targets[0].match_parts('1-2RW0@123')
-        self.assertEqual(parts, {"catalog": '1@123', "schema": "S1", "table": "T1", "column": "c1", "key": '1-2RW0'})
+        self.assertEqual(parts, {"server_url": "http://localhost", "catalog": '1@123', "schema": "S1", "table": "T1", "column": "c1", "key": '1-2RW0'})
         self.assertEqual(
             _config1.targets[0].ermrest_url_template % parts,
-            '/ermrest/catalog/1@123/entity/S1:T1/c1=1-2RW0'
+            'http://localhost/ermrest/catalog/1@123/entity/S1:T1/c1=1-2RW0'
         )
         self.assertEqual(
             _config1.targets[0].chaise_url_template % parts,
-            '/chaise/record/#1@123/S1:T1/c1=1-2RW0'
+            'http://localhost/chaise/record/#1@123/S1:T1/c1=1-2RW0'
         )
 
     def test_nonmatch_unversioned(self):

@@ -63,8 +63,8 @@ The final redirected URL may be content-negotiated:
 
 Given an existing server with operational ERMrest service endpoint, an
 administrator may deploy ERMresolve as another sibling service on the
-same webserver. ERMresolve currently only contacts its companion
-ERMrest service via the `localhost` loopback interface.
+same webserver. ERMresolve by default contacts its companion ERMrest
+service via the local host's fully-qualified domain name.
 
 ### Prerequisites
 
@@ -106,7 +106,7 @@ following the more complex ERMrest installation procedure.
 2. From the source directory, run the installation script.
    ```
    # cd ermresolve
-   # python ./setup.py install
+   # pip install .
    ```
 
 ### Service Deployment and Configuration
@@ -114,8 +114,9 @@ following the more complex ERMrest installation procedure.
 1. Create `ermresolve` daemon user to run the web service.
    ```
    # useradd --create-home --system ermresolve
+   # chmod og+rx ~ermresolve
    ```
-2. Configure `~/ermresolve.json` in daemon home directory.
+2. Configure `~/ermresolve.json` in daemon home directory, readable by Apache HTTPD.
    - See [example ERMresolve configuration](#example-ermresolve-configuration)
 3. Configure `mod_wsgi` to run ERMresolve.
    - See [example WSGI configuration](#example-wsgi-configuration)
@@ -124,20 +125,43 @@ following the more complex ERMrest installation procedure.
    # service httpd restart
    ```
 
+### Working with SE-Linux
+
+The following is an example set of commands to allow ERMresolve to
+read its configuration data and talk to ERMrest on a Fedora
+installation.  On other distributions, the appropriate path and
+SE-Linux contexts might vary slightly:
+
+    setsebool -P httpd_can_network_connect on
+    setsebool -P httpd_execmem on
+    semanage fcontext --add --type httpd_sys_content_t "/home/ermresolve(/ermresolve_config.json)?"
+    restorecon -rv /home/ermresolve
+
+NOTE: for those uncomfortable with enabling `httpd_execmem`, the
+alternative is to only use plain `http://` URLs in the configured
+targets. Unfortunately, the Python `requests` library seems to require
+`httpd_execmem` when using HTTPS protocol to talk to ERMrest.
+
 ### Configuration Language
 
-The configuration data structure has at its core a list of
-configuration objects, each with named fields:
+The configuration file has a top-level object with two fields:
 
-- `patterns`: one or more Python regular expressions with named groups
-   for `KEY` and optionally `SNAP`
-   - the `KEY` group MUST be present and matching the row key material
-   - the `SNAP` group SHOULD be present if and only if it matches
-    catalog snapshot identifier
-- `catalog`: the target catalog identifier
-- `schema`: the target schema name
-- `table`: the target table name
-- `column`: the target column name
+- `"server_url"`: The base server URL to use when talking to ERMrest
+  (optional, defaults to `http://fqdn` for the local host's
+  fully-qualified domain name).
+- `"targets"`: An array of configuration objects, each with named
+  fields:
+   - `patterns`: one or more Python regular expressions with named
+      groups for `KEY` and optionally `SNAP`
+      - the `KEY` group MUST be present and matching the row key material
+      - the `SNAP` group SHOULD be present if and only if it matches
+        catalog snapshot identifier
+   - `server_url`: the target base server URL (optional, defaults to
+     global setting)
+   - `catalog`: the target catalog identifier
+   - `schema`: the target schema name
+   - `table`: the target table name
+   - `column`: the target column name
 
 ERMresolve will produce one of two ERMrest URL formats to attempt to
 resolve a matching identifier, e.g.:
@@ -155,7 +179,8 @@ for the identifier.
 
 For brevity of configuration, a variety of pluralized target names can
 optionally imply a family of related configuration objects in a more
-terse configuration syntax.
+terse configuration syntax. This is helpful when searching large
+numbers of tables in a complex catalog model.
 
 - `catalog_schema_table_columns`: a list of `[catalog, schema, table,
   column]` quadruples
@@ -167,34 +192,38 @@ terse configuration syntax.
 This table summarizes the source of each configuration value when
 mixing notations:
 
-| Sugar format                   | Pattern    | Catalog   | Schema   | Table   | Column   |
-|--------------------------------|------------|-----------|----------|---------|----------|
-| no sugar                       | `patterns` | `catalog` | `schema` | `table` | `column` |
-| `tables`                       | `patterns` | `catalog` | `schema` | list element | `column` |
-| `table_columns`                | `patterns` | `catalog` | `schema` | 2-tuple | 2-tuple  |
-| `schema_tables`                | `patterns` | `catalog` | 2-tuple  | 2-tuple | `column` |
-| `schema_table_columns`         | `patterns` | `catalog` | 3-tuple  | 3-tuple | 3-tuple  |
-| `catalog_schema_table_columns` | `patterns` | 4-tuple   | 4-tuple  | 4-tuple | 4-tuple  |
+| Sugar format                   | Pattern    | Server URL   | Catalog   | Schema   | Table   | Column   |
+|--------------------------------|------------|--------------|-----------|----------|---------|----------|
+| no sugar                       | `patterns` | `server_url` | `catalog` | `schema` | `table` | `column` |
+| `tables`                       | `patterns` | `server_url` | `catalog` | `schema` | list element | `column` |
+| `table_columns`                | `patterns` | `server_url` | `catalog` | `schema` | 2-tuple | 2-tuple  |
+| `schema_tables`                | `patterns` | `server_url` | `catalog` | 2-tuple  | 2-tuple | `column` |
+| `schema_table_columns`         | `patterns` | `server_url` | `catalog` | 3-tuple  | 3-tuple | 3-tuple  |
+| `catalog_schema_table_columns` | `patterns` | `server_url` | 4-tuple   | 4-tuple  | 4-tuple | 4-tuple  |
 
 If multiple notations are combined, they are implicitly ordered as per
 this table. The ERMresolve service does not attempt to preserve or
-intepret the JSON document order of the configuration object's fields!
+intepret the JSON document order of fields within the configuration object.
 
-Each case above is only activated if **all** sources in that row are
-properly configured. However, if `patterns` is absent in the object, a
-default pattern list is configured:
+Each case above is only activated if **all** sources in that sugar
+format are properly configured. However, if `patterns` is absent in
+the target object, a default pattern list is configured:
 
     [
       "^(?P<KEY>[-0-9A-Za-z]+)$",
       "^(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$"
     ]
+	
+Similarly, if `server_url` is absent in the target, the service-wide
+setting is is chosen, and that in turn has a default defined in case
+it is not present in the top-level configuration document.
 
-this set of patterns can match an unversioned RID such as `1-X140` or
-a versioned RID such as `1-X140@2P4-RJ1W-WGHG`.  When a deployment
-cannot or should not resolve versioned identifiers, the `patterns`
-list SHOULD be overridden to eliminate the default pattern that
-matches the `SNAP` group. Resolvers MAY also be configured to match
-other legacy identifier types other than the ERMrest RID column
+The default set of patterns can match an unversioned RID such as
+`1-X140` or a versioned RID such as `1-X140@2P4-RJ1W-WGHG`.  When a
+deployment cannot or should not resolve versioned identifiers, the
+`patterns` list SHOULD be overridden to eliminate the default pattern
+that matches the `SNAP` group. Resolvers MAY also be configured to
+match other legacy identifier types other than the ERMrest RID column
 syntax.
 
 ### Example ERMresolve Configuration
@@ -202,17 +231,20 @@ syntax.
 This example JSON content demonstrates a resolver that can search two
 named tables and find entities cited by their immutable `RID` key:
 
-    [
-      {
-        "catalog": 1,
-        "column": "RID",
-        "schema": "My Schema",
-        "tables": [
-          "table 1",
-          "table 2"
-        ]
-      }
-    ]
+    {
+      "server_url": "http://example.com",
+      "targets": [
+        {
+          "catalog": 1,
+          "column": "RID",
+          "schema": "My Schema",
+          "tables": [
+            "table 1",
+            "table 2"
+          ]
+        }
+      ]
+    }
 
 ### Example WSGI Configuration
 
@@ -223,6 +255,8 @@ named tables and find entities cited by their immutable `RID` key:
     WSGISocketPrefix /var/run/wsgi/wsgi
     
     <Location /project1>
+       Satisfy any
+       Allow from all
        WSGIProcessGroup ermresolve
     </Location>
 
