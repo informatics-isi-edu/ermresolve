@@ -72,11 +72,12 @@ The essential ERMrest prerequisite also satisfies most of the other
 third-party prerequisites since they share common implementation
 techniques.
 
-- ERMrest functioning at `/ermrest/` path
+- ermrest (and functioning at `/ermrest/` path on server)
+- webauthn2
 - Apache HTTPD
 - mod_wsgi
 - web.py lightweight web framework
-- Chaise web UI at `/chaise/` path
+- Chaise web UI at `/chaise/` path on server
 
 ### Planning the Deployment
 

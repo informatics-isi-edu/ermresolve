@@ -16,6 +16,7 @@
 #
 
 import web
+from webauthn2.util import negotiated_content_type
 from ermrest.exception.rest import *
 from .config import get_service_config
 
@@ -44,6 +45,11 @@ class Resolver (object):
         """Resolve url_id_part and redirect client to current GUI or data URL."""
         syntax_matched = False
 
+        content_type = negotiated_content_type(
+            ['text/csv', 'application/json', 'application/x-json-stream', 'text/html'],
+            'application/json'
+        )
+
         # search in order for syntax match
         for target in _config.targets:
             parts = target.match_parts(url_id_part)
@@ -61,7 +67,10 @@ class Resolver (object):
                         rows = resp.json()
                         if rows:
                             assert len(rows) == 1, "resolution should never find multiple rows"
-                            raise web.seeother(ermrest_url)
+                            if content_type == 'text/html':
+                                raise web.seeother(target.chaise_url_template % parts)
+                            else:
+                                raise web.seeother(ermrest_url)
 
                     web.debug('ERMresolve %s did not produce a result' % ermrest_url)
 
