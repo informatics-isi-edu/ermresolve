@@ -185,8 +185,8 @@ properly configured. However, if `patterns` is absent in the object, a
 default pattern list is configured:
 
     [
-      "(?P<KEY>[-0-9A-Za-z]+)",
-      "(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)"
+      "^(?P<KEY>[-0-9A-Za-z]+)$",
+      "^(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$"
     ]
 
 this set of patterns can match an unversioned RID such as `1-X140` or

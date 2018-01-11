@@ -1,0 +1,72 @@
+[
+    {
+	"catalog": 1,
+	"schema": "S1",
+	"table": "T1",
+	"column": "c1"
+    },
+    {
+	"catalog_schema_table_columns": [
+	    [2, "S2a", "T2a", "c2a"],
+	    [2, "S2b", "T2b", "c2b"]
+	]
+    },
+    {
+	"catalog": 3,
+	"schema_table_columns": [
+	    ["S3a", "T3a", "c3a"],
+	    ["S3b", "T3b", "c3b"]
+	]
+    },
+    {
+	"catalog": 4,
+	"column": "c4",
+	"schema_tables": [
+	    ["S4a", "T4a"],
+	    ["S4b", "T4b"]
+	]
+    },
+    {
+	"catalog": 5,
+	"schema": "S5",
+	"table_columns": [
+	    ["T5a", "c5a"],
+	    ["T5b", "c5b"]
+	]
+    },
+    {
+	"catalog": 6,
+	"schema": "S6",
+	"column": "c6",
+	"tables": [
+	    "T6a",
+	    "T6b"
+	]
+    },
+    {
+	"catalog": 7,
+	"schema": "S7",
+	"table": "T7",
+	"column": "c7",
+	"catalog_schema_table_columns": [
+	    [7, "S7i", "T7i", "c7i"],
+	    [7, "S7j", "T7j", "c7j"]
+	],
+	"schema_table_columns": [
+	    ["S7g", "T7g", "c7g"],
+	    ["S7h", "T7h", "c7h"]
+	],
+	"schema_tables": [
+	    ["S7e", "T7e"],
+	    ["S7f", "T7f"]
+	],
+	"table_columns": [
+	    ["T7c", "c7c"],
+	    ["T7d", "c7d"]
+	],
+	"tables": [
+	    "T7a",
+	    "T7b"
+	]
+    }
+]
