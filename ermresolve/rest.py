@@ -15,6 +15,9 @@
 # limitations under the License.
 #
 
+import urllib
+import json
+
 import web
 from webauthn2.util import negotiated_content_type
 from ermrest.exception.rest import *
@@ -60,7 +63,19 @@ class Resolver (object):
                 ermrest_url = (target.ermrest_url_template % parts)
                 with _session.get(
                         ermrest_url,
-                        headers={"Accept": "application/json"}
+                        headers={
+                            "Accept": "application/json",
+                            "Deriva-Client-Context": urllib.quote(
+                                json.dumps(
+                                    {
+                                        "cid": "ermresolve",
+                                        "pid": web.ctx.env['UNIQUE_ID'],
+                                    },
+                                    separators=(',', ':')
+                                ),
+                                safe='",:{}'
+                            )
+                        }
                 ) as resp:
                     rows = None
                     if resp.status_code == 200:
