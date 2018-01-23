@@ -143,13 +143,23 @@ alternative is to only use plain `http://` URLs in the configured
 targets. Unfortunately, the Python `requests` library seems to require
 `httpd_execmem` when using HTTPS protocol to talk to ERMrest.
 
+If you enable authenticated requests, the named `"credential_file"` in
+the configuration must also be readable by the service, e.g. by adding
+another related policy:
+
+    semanage fcontext --add --type httpd_sys_content_t "/home/secrets/ermresolve(/ermresolve_cred.json)?"
+    restorecon -rv /home/secrets/ermresolve
+
 ### Configuration Language
 
-The configuration file has a top-level object with two fields:
+The configuration file has a top-level object with several fields:
 
 - `"server_url"`: The base server URL to use when talking to ERMrest
   (optional, defaults to `http://fqdn` for the local host's
   fully-qualified domain name).
+- `"credential_file"`: The deriva-py formatted credential file needed
+  to make authenticated requests to the configured ERMrest
+  `"server_url"` (optional, defaults to anonymous requests).
 - `"targets"`: An array of configuration objects, each with named
   fields:
    - `patterns`: one or more Python regular expressions with named

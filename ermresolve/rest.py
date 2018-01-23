@@ -40,6 +40,20 @@ _retries = Retry(
 _session.mount('http://', HTTPAdapter(max_retries=_retries))
 _session.mount('https://', HTTPAdapter(max_retries=_retries))
 
+if _config.credential_file is not None:
+    with open(_config.credential_file, 'rb') as credential_file:
+        _credentials = json.load(credential_file)
+else:
+    _credentials = {}
+
+def target_server(target):
+    if target.server_url.startswith('https://'):
+        return target.server_url[len('https://'):]
+    elif target.server_url.startswith('http://'):
+        return target.server_url[len('http://'):]
+    else:
+        raise NotImplementedError("unsupported server_url %s" % target.server_url)
+
 class Resolver (object):
     """Implements ERMresolve REST API as a web.py request handler.
 
@@ -60,23 +74,24 @@ class Resolver (object):
                 syntax_matched = True
 
                 # see if this target is the right one in ERMrest
+                headers = {
+                    "Accept": "application/json",
+                    "Deriva-Client-Context": urllib.quote(
+                        json.dumps(
+                            {
+                                "cid": "ermresolve",
+                                "pid": web.ctx.env['UNIQUE_ID'],
+                            },
+                            separators=(',', ':')
+                        ),
+                        safe='",:{}'
+                    )
+                }
+                cookie = _credentials.get(target_server(target), {}).get('cookie', None)
+                if cookie is not None:
+                    headers['Cookie'] = cookie
                 ermrest_url = (target.ermrest_url_template % parts)
-                with _session.get(
-                        ermrest_url,
-                        headers={
-                            "Accept": "application/json",
-                            "Deriva-Client-Context": urllib.quote(
-                                json.dumps(
-                                    {
-                                        "cid": "ermresolve",
-                                        "pid": web.ctx.env['UNIQUE_ID'],
-                                    },
-                                    separators=(',', ':')
-                                ),
-                                safe='",:{}'
-                            )
-                        }
-                ) as resp:
+                with _session.get(ermrest_url, headers=headers) as resp:
                     rows = None
                     if resp.status_code == 200:
                         rows = resp.json()
