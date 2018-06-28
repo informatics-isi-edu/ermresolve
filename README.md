@@ -174,6 +174,10 @@ The configuration file has a top-level object with several fields:
    - `table`: the target table name
    - `column`: the target column name
 
+When the `targets` list includes multiple target configuration
+objects, the target tables represented by the configuration are
+searched in list order.
+
 ERMresolve will produce one of two ERMrest URL formats to attempt to
 resolve a matching identifier, e.g.:
 
@@ -212,9 +216,18 @@ mixing notations:
 | `schema_table_columns`         | `patterns` | `server_url` | `catalog` | 3-tuple  | 3-tuple | 3-tuple  |
 | `catalog_schema_table_columns` | `patterns` | `server_url` | 4-tuple   | 4-tuple  | 4-tuple | 4-tuple  |
 
-If multiple notations are combined, they are implicitly ordered as per
-this table. The ERMresolve service does not attempt to preserve or
-intepret the JSON document order of fields within the configuration object.
+When syntactic sugar notations are combined into a single
+configuration object, the ERMresolve service does not attempt to
+preserve nor interpret the relative JSON document-order of these
+fields.  Rather, the set of sugars will be expanded in the order
+presented in the preceding table. However, all targets expanded from
+one object will remain ordered with respect to all targets expanded
+from a preceding or succeeding object in the `targets` list. Likewise,
+for each sugar that is present, its local list of tuples (or strings)
+will be expanded to a list of target tables in the same list order.
+If the administrator wishes to override the order of sugar expansion,
+she should split the sugars into separate configuration objects and
+order them as desired in the `targets` list.
 
 Each case above is only activated if **all** sources in that sugar
 format are properly configured. However, if `patterns` is absent in
