@@ -25,11 +25,14 @@ evolving ERMrest catalog models:
 2. ERMresolve can fuse multiple tables into its identifier space,
    shielding citations from changes in ERM granularity where tables
    have been merged or split over time.
+3. ERMresolve can hide the catalog identifier if configured to work
+   on a default catalog.
 
 NOTE: ERMresolve **does not** provide stable identifiers if the
 underlying ERMrest catalog content does not provide any stable
-identifying attributes. A best practice when using ERMresolve would be
-to expose immutable row identifiers such as the `RID` column.
+identifying attributes. The best practice when using ERMresolve is
+to use RID values of entities. Alternate configuration allows some
+ERMresolve instances to also resolve legacy identifiers.
 
 ## Using ERMresolve
 
@@ -46,7 +49,7 @@ experience related to citable data:
 3. A secondary data consumer encounters the citation and wishes to
    review the same data.
    - The CURIE is mapped to an ERMresolve URL such as
-    `https://example.com/foo/1-X140`.
+    `https://foo.example.com/id/1-X140`.
    - An HTTP GET operation is performed on the ERMresolve URL.
    - ERMresolve determines a current mapping and issues an appropriate
     HTTP redirect response.
@@ -56,8 +59,36 @@ The final redirected URL may be content-negotiated:
 
 1. For clients requesting HTML, a Chaise GUI application URL is
    supplied, e.g. `https://example.com/chaise/#1/Schema:Table/RID=1-X140`.
+   - Or a Chaise resolver error app? TBD.
 2. For clients requesting JSON or CSV data, a raw ERMrest data URL is
    supplied, e.g. `https://example.com/ermrest/catalog/1/Schema:Table/RID=1-X140`.
+   - Or a raw HTTP error response? TBD.
+
+### Multi-tenancy
+
+For projects wishing to service a number of catalogs out of a single
+resolver, we recommend prefixing the local key portion of the CURIE with
+a catalog identifier as a path element. e.g.:
+
+1. A researcher creates an entity in a table in catalog `7` with RID
+   value `1-X140`.
+2. The *citation* CURIE is `FOO:7/1-X140`.
+3. The `FOO` prefix represents the multi-tenant ERMresolve instance
+   `https://foo.example.com/id/`
+4. The CURIE is mapped to `https://foo.example.com/7/1-X140`.
+
+If desired, a community could also establish a separate
+catalog-specific CURIE prefix:
+
+1. The *citation* CURIE is `SUBFOO:1-X140`.
+2. The `SUBFOO` prefix represents the catalog sub-space of the
+   ERMresolve instance `https://foo.example.com/id/7/`.
+3 This alternate CURIE is mapped to the same URL
+   `https://foo.example.com/7/1-X140`.
+
+With an appropriate configuration, ERMresolve will recognize the `7`
+in the URL as a catalog identifier and attempt resolution of the
+`1-X140` key in the given catalog.
 
 ## Deploying ERMresolve
 
@@ -157,118 +188,134 @@ The configuration file has a top-level object with several fields:
 - `"server_url"`: The base server URL to use when talking to ERMrest
   (optional, defaults to `http://fqdn` for the local host's
   fully-qualified domain name).
+- `"catalog"`: The default catalog to consult.
 - `"credential_file"`: The deriva-py formatted credential file needed
   to make authenticated requests to the configured ERMrest
   `"server_url"` (optional, defaults to anonymous requests).
 - `"targets"`: An array of configuration objects, each with named
-  fields:
+  fields (optional, defaults to `[{}]`):
    - `patterns`: one or more Python regular expressions with named
-      groups for `KEY` and optionally `SNAP`
+      groups for `KEY` and optionally `SNAP` and/or `CAT`
       - the `KEY` group MUST be present and matching the row key material
       - the `SNAP` group SHOULD be present if and only if it matches
         catalog snapshot identifier
+	  - the `CAT` group SHOULD be present if and only it matches an
+        embedded catalog identifier
    - `server_url`: the target base server URL (optional, defaults to
      global setting)
-   - `catalog`: the target catalog identifier
-   - `schema`: the target schema name
-   - `table`: the target table name
-   - `column`: the target column name
+   - `catalog`: the target catalog identifier (optional)
+   - `schema`: the target schema name (optional)
+   - `table`: the target table name (optional)
+   - `column`: the target column name (optional)
+
+#### Catalog selection
+
+The configured catalog for a matching target is chosen in the
+following order (first applicable source wins):
+
+1. The `CAT` group in the match supplies a catalog identifier from the
+   ERMresolve URL.
+2. The `catalog` field of the target supplies a non-null value.
+3. The service-wide `catalog` field supplies a non-null value.
+4. The target is considered *incomplete* and is skipped.
+
+#### Multiple targets and default target
 
 When the `targets` list includes multiple target configuration
 objects, the target tables represented by the configuration are
 searched in list order.
 
-ERMresolve will produce one of two ERMrest URL formats to attempt to
-resolve a matching identifier, e.g.:
+Subsequent targets are searched only if the previous targets do not
+have a matching pattern or yield an inconclusive resolution, i.e. no
+match when probing that target in ERMrest.
+
+The default `targets` list `[{}]` enables the new resolution method,
+taking into consideration any default `server_url` and `catalog`
+settings in the service-wide configuration.
+
+#### New resolution method
+
+When the `schema`, `table`, and `column` fields are all absent or set
+to `null`, ERMresolve is configured to use the new `/entity_rid/` API
+of the configured ERMrest catalog. This method generates GET requests
+on the following forms of ERMrest URL:
+
+1. Versioned entity_rid:
+   `/ermrest/catalog/1@2P4-RJ1W-WGHG/entity_rid/1-X140`
+2. Unversioned entity_rid:
+   `/ermrest/catalog/1/entity_rid/1-X140`
+
+ERMresolve understands the special JSON response format of this API
+and interprets them appropriately.
+
+#### Legacy resolution method
+
+When the `schema`, `table`, and `column` fields are all present with
+non-null values, ERMresolve is configured to use the `/entity/` API
+of the configured ERMrest catalog. This method generates GET requests
+on the following forms of ERMrest URL:
 
 1. Versioned entity:
    `/ermrest/catalog/1@2P4-RJ1W-WGHG/entity/Schema:Table/RID=1-X140`
 2. Unversioned entity:
    `/ermrest/catalog/1/entity/Schema:Table/RID=1-X140`
 
-The first configuration block with a matching pattern **and** a
-non-empty entity query result will be considered the proper resolution
-for the identifier.
+A non-empty result set is interpreted as successful resolution of
+the entity in the target table.
 
-#### Syntactic Sugars
+#### Default patterns
 
-For brevity of configuration, a variety of pluralized target names can
-optionally imply a family of related configuration objects in a more
-terse configuration syntax. This is helpful when searching large
-numbers of tables in a complex catalog model.
-
-- `catalog_schema_table_columns`: a list of `[catalog, schema, table,
-  column]` quadruples
-- `schema_table_columns`: a list of `[schema, table, column]` triples
-- `schema_tables`: a list of `[schema, table]` schema-table name pairs
-- `table_columns`: a list of `[table, column]` table-column name pairs
-- `tables`: a list of table names (in the single schema)
-
-This table summarizes the source of each configuration value when
-mixing notations:
-
-| Sugar format                   | Pattern    | Server URL   | Catalog   | Schema   | Table   | Column   |
-|--------------------------------|------------|--------------|-----------|----------|---------|----------|
-| no sugar                       | `patterns` | `server_url` | `catalog` | `schema` | `table` | `column` |
-| `tables`                       | `patterns` | `server_url` | `catalog` | `schema` | list element | `column` |
-| `table_columns`                | `patterns` | `server_url` | `catalog` | `schema` | 2-tuple | 2-tuple  |
-| `schema_tables`                | `patterns` | `server_url` | `catalog` | 2-tuple  | 2-tuple | `column` |
-| `schema_table_columns`         | `patterns` | `server_url` | `catalog` | 3-tuple  | 3-tuple | 3-tuple  |
-| `catalog_schema_table_columns` | `patterns` | `server_url` | 4-tuple   | 4-tuple  | 4-tuple | 4-tuple  |
-
-When syntactic sugar notations are combined into a single
-configuration object, the ERMresolve service does not attempt to
-preserve nor interpret the relative JSON document-order of these
-fields.  Rather, the set of sugars will be expanded in the order
-presented in the preceding table. However, all targets expanded from
-one object will remain ordered with respect to all targets expanded
-from a preceding or succeeding object in the `targets` list. Likewise,
-for each sugar that is present, its local list of tuples (or strings)
-will be expanded to a list of target tables in the same list order.
-If the administrator wishes to override the order of sugar expansion,
-she should split the sugars into separate configuration objects and
-order them as desired in the `targets` list.
-
-Each case above is only activated if **all** sources in that sugar
-format are properly configured. However, if `patterns` is absent in
-the target object, a default pattern list is configured:
+If `patterns` is absent in the target object, a default pattern list
+is configured:
 
     [
       "^(?P<KEY>[-0-9A-Za-z]+)$",
       "^(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$"
+      "^(?P<CAT>[^/]+/)(?P<KEY>[-0-9A-Za-z]+)$",
+      "^(?P<CAT>[^/]+/))(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$"
     ]
-	
-Similarly, if `server_url` is absent in the target, the service-wide
-setting is is chosen, and that in turn has a default defined in case
-it is not present in the top-level configuration document.
 
-The default set of patterns can match an unversioned RID such as
-`1-X140` or a versioned RID such as `1-X140@2P4-RJ1W-WGHG`.  When a
-deployment cannot or should not resolve versioned identifiers, the
-`patterns` list SHOULD be overridden to eliminate the default pattern
-that matches the `SNAP` group. Resolvers MAY also be configured to
-match other legacy identifier types other than the ERMrest RID column
-syntax.
+This default set of patterns can match:
+- RIDs in an implicit, default catalog:
+   - Unversioned RIDs such as `1-X140`
+   - Versioned RIDs such as `1-X140@2P4-RJ1W-WGHG`
+- RIDs in a specific catalog:
+   - Unversioned RIDs such as `7/1-X140`
+   - Versioned RIDs such as `7/1-X140@2P4-RJ1W-WGHG`
+
+These defaults SHOULD be overridden with the `patterns` configuration
+field if it is not desirable to support versioned RIDs or embedded
+catalog identifiers.
+
+#### Default server URL
+
+If `server_url` is absent in the target, the service-wide setting is
+is chosen, and that in turn has a default defined in case it is not
+present in the top-level configuration document.
 
 ### Example ERMresolve Configuration
 
-This example JSON content demonstrates a resolver that can search two
-named tables and find entities cited by their immutable `RID` key:
+This example JSON content demonstrates a resolver that can search for
+any RID in the default catalog, search for RIDs in designated
+catalogs, and attempt a fallback resolution for a legacy identifier:
 
     {
-      "server_url": "http://example.com",
+      "server_url": "http://foo.example.com",
+      "catalog": 1,
       "targets": [
-        {
-          "catalog": 1,
-          "column": "RID",
-          "schema": "My Schema",
-          "tables": [
-            "table 1",
-            "table 2"
-          ]
-        }
+        { },
+		{
+		  "schema": "legacy_schema",
+		  "table": "legacy_table",
+		  "column": "legacy_id"
+		}
       ]
     }
+
+The first, empty target `{ }` tells ERMresolve to first try the new
+resolution method using the default catalog `1` (unless the `CAT` group
+provides a different catalog identifier). The second target configures
+a custom search on a legacy table.
 
 ### Example WSGI Configuration
 
@@ -278,11 +325,17 @@ named tables and find entities cited by their immutable `RID` key:
     
     WSGISocketPrefix /var/run/wsgi/wsgi
     
-    <Location /project1>
+    <Location /id>
        Satisfy any
        Allow from all
        WSGIProcessGroup ermresolve
     </Location>
+
+For complex deployments, more than one `Location` may be
+configured. Using different `WSGIProcessGroup` and `WSGIDaemonProcess`
+stanzas, separate daemon accounts with separate configuration files
+can be used for each ERMresolve instance at a separate URL location
+prefix.
 
 ## Help and Contact
 
