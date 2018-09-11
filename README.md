@@ -271,8 +271,8 @@ is configured:
     [
       "^(?P<KEY>[-0-9A-Za-z]+)$",
       "^(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$"
-      "^(?P<CAT>[^/]+/)(?P<KEY>[-0-9A-Za-z]+)$",
-      "^(?P<CAT>[^/]+/))(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$"
+      "^(?P<CAT>[^/@]+)/(?P<KEY>[-0-9A-Za-z]+)$",
+      "^(?P<CAT>[^/@]+)/)(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$"
     ]
 
 This default set of patterns can match:

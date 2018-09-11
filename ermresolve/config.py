@@ -50,10 +50,11 @@ class ResolverTarget (object):
                 raise TypeError('Target "%s" type %s not supported.' % (name, type(s)))
             return s
 
-        self.catalog = validate('catalog', catalog, [int])
-        self.schema = validate('schema', schema)
-        self.table = validate('table', table)
-        self.column = validate('column', column)
+        self.catalog = validate('catalog', catalog, [int, type(None)])
+        self.schema = validate('schema', schema, [type(None)])
+        self.table = validate('table', table, [type(None)])
+        self.column = validate('column', column, [type(None)])
+        self.legacy = self.schema is not None and self.table is not None and self.column is not None
 
     def __str__(self):
         return "ResolverTarget(%s, %s, %s, %s, %s, %s)" % self.astuple()
@@ -79,79 +80,44 @@ class ResolverTarget (object):
             m = re.match(pattern, url_id_part)
             if m:
                 g = m.groupdict()
+                if g.get("CAT", self.catalog) is None:
+                    # don't allow a match if target catalog is not determined
+                    return
                 return {
                     "server_url": self.server_url,
                     "catalog": "%s%s" % (
-                        self.catalog,
+                        g.get("CAT", self.catalog),
                         ('@' + g['SNAP']) if "SNAP" in g else ''
                     ),
-                    "schema": urlquote(self.schema),
-                    "table": urlquote(self.table),
-                    "column": urlquote(self.column),
-                    "key": g["KEY"]
+                    "schema": urlquote(self.schema) if self.schema is not None else None,
+                    "table": urlquote(self.table) if self.table is not None else None,
+                    "column": urlquote(self.column) if self.column is not None else None,
+                    "key": g["KEY"],
                 }
 
-    ermrest_url_template = "%(server_url)s/ermrest/catalog/%(catalog)s/entity/%(schema)s:%(table)s/%(column)s=%(key)s"
+    ermrest_resolve_template = "%(server_url)s/ermrest/catalog/%(catalog)s/entity_rid/%(key)s"
+    ermrest_url_template = "%(server_url)s/ermrest/catalog/%(catalog)s/entity/%(schema)s:%(table)s/%(column)s=%(key)s?limit=2"
     chaise_url_template = "%(server_url)s/chaise/record/#%(catalog)s/%(schema)s:%(table)s/%(column)s=%(key)s"
 
     @classmethod
-    def from_config_element(cls, element, server_url):
+    def from_config_element(cls, element, server_url, catalog):
         """Construct iterable set of targets from config document element."""
         patterns = element.get(
             'patterns',
             [
                 '^(?P<KEY>[-0-9A-Za-z]+)$',
                 '^(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$',
+                '^(?P<CAT>[^/@]+)/(?P<KEY>[-0-9A-Za-z]+)$',
+                '^(?P<CAT>[^/@]+)/(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$',
             ]
         )
+        server_url = element.get('server_url', server_url)
+        catalog = element.get('catalog', catalog)
+        schema = element.get('schema')
+        table = element.get('table')
+        column = element.get('column')
 
-        def validate_list(name, n):
-            l = element[name]
-            if type(l) is not list:
-                raise TypeError('Target set "%s" must be a list, not %s.' % (name, type(l)))
-            for item in l:
-                if type(item) is not list:
-                    raise TypeError('Target set "%s" member must be a list, not %s.' % (name, type(item)))
-                if len(item) != n:
-                    raise ValueError('Target set "%s" member %s must have length %d, not %d.' % (name, n, len(item)))
-                yield item
-
-        # conditionally expand the different syntactic sugar permutations
-        # these must be done in a specific order to meet the documented behavior
-        if 'catalog' in element:
-            catalog = element['catalog']
-
-            if 'schema' in element:
-                schema = element['schema']
-
-                if 'column' in element:
-                    column = element['column']
-
-                    if 'table' in element:
-                        # this is the "no sugar" scenario
-                        table = element['table']
-                        yield cls(patterns, element.get('server_url', server_url), catalog, schema, table, column)
-
-                    if 'tables' in element:
-                        for table in element['tables']:
-                            yield cls(patterns, element.get('server_url', server_url), catalog, schema, table, column)
-
-                if 'table_columns' in element:
-                    for table, column in validate_list('table_columns', 2):
-                        yield cls(patterns, element.get('server_url', server_url), catalog, schema, table, column)
-
-            if 'schema_tables' in element:
-                column = element.get('column')
-                for schema, table in validate_list('schema_tables', 2):
-                    yield cls(patterns, element.get('server_url', server_url), catalog, schema, table, column)
-
-            if 'schema_table_columns' in element:
-                for schema, table, column in validate_list('schema_table_columns', 3):
-                    yield cls(patterns, element.get('server_url', server_url), catalog, schema, table, column)
-
-        if 'catalog_schema_table_columns' in element:
-            for catalog, schema, table, column in validate_list('catalog_schema_table_columns', 4):
-                yield cls(patterns, element.get('server_url', server_url), catalog, schema, table, column)
+        yield cls(patterns, server_url, catalog, schema, table, column)
 
 class ResolverConfig (object):
     def __init__(self, doc):
@@ -160,11 +126,12 @@ class ResolverConfig (object):
             raise TypeError('ERMresolve configuration MUST be an object.')
         self.server_url = doc.get('server_url', 'http://' + platform.node())
         self.credential_file = doc.get('credential_file')
-        targets_doc = doc.get('targets', [])
+        self.catalog = doc.get('catalog')
+        targets_doc = doc.get('targets', [{}])
         if type(targets_doc) is not list:
             raise TypeError('ERMresolve "targets" MUST be a list of target definitions.')
         for element in targets_doc:
-            self.targets.extend(ResolverTarget.from_config_element(element, self.server_url))
+            self.targets.extend(ResolverTarget.from_config_element(element, self.server_url, self.catalog))
 
 def get_service_config(configfile=None):
     """Construct ERMresolve configuration objects from JSON configuration file."""
