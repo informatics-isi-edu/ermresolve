@@ -56,12 +56,18 @@ class ResolverTarget (object):
         self.column = validate('column', column, [type(None)])
         self.legacy = self.schema is not None and self.table is not None and self.column is not None
 
-    def __str__(self):
-        return "ResolverTarget(%s, %s, %s, %s, %s, %s)" % self.astuple()
+        if not self.legacy:
+            missing = [ attr for attr in ["schema", "table", "column"] if getattr(self, attr) is None ]
+            if len(missing) < 3:
+                raise ValueError("Incomplete legacy target %s lacks %s configuration." % (self.astuple(False), "/".join(missing)))
 
-    def astuple(self):
-        return (
+    def __str__(self):
+        return "ResolverTarget%s" % (self.astuple(),)
+
+    def astuple(self, include_patterns=True):
+        return ((
             [ p.pattern for p in self.patterns ],
+        ) if include_patterns else ()) + (
             self.server_url,
             self.catalog,
             self.schema,

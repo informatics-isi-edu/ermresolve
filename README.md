@@ -204,9 +204,9 @@ The configuration file has a top-level object with several fields:
    - `server_url`: the target base server URL (optional, defaults to
      global setting)
    - `catalog`: the target catalog identifier (optional)
-   - `schema`: the target schema name (optional)
-   - `table`: the target table name (optional)
-   - `column`: the target column name (optional)
+   - `schema`: legacy target schema name (optional)
+   - `table`: legacy target table name (optional)
+   - `column`: legacy target column name (optional)
 
 #### Catalog selection
 
@@ -250,7 +250,7 @@ and interprets them appropriately.
 
 #### Legacy resolution method
 
-When the `schema`, `table`, and `column` fields are all present with
+When the `schema`, `table`, and `column` fields are present with
 non-null values, ERMresolve is configured to use the `/entity/` API
 of the configured ERMrest catalog. This method generates GET requests
 on the following forms of ERMrest URL:
@@ -262,6 +262,9 @@ on the following forms of ERMrest URL:
 
 A non-empty result set is interpreted as successful resolution of
 the entity in the target table.
+
+A partial legacy configuration target is considered invalid and the
+service will abort with diagnostics in the HTTPD error log.
 
 #### Default patterns
 
