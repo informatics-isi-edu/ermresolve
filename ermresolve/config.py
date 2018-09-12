@@ -17,6 +17,7 @@
 
 import platform
 import os
+import os.path
 import json
 import re
 import urllib
@@ -143,5 +144,8 @@ def get_service_config(configfile=None):
     """Construct ERMresolve configuration objects from JSON configuration file."""
     if configfile is None:
         configfile = '%s/ermresolve_config.json' % os.environ.get('HOME', './')
-    with open(configfile) as f:
-        return ResolverConfig(json.load(f))
+    if os.path.exists(configfile) or os.path.islink(configfile):
+        with open(configfile) as f:
+            return ResolverConfig(json.load(f))
+    else:
+        return ResolverConfig({})

@@ -67,24 +67,29 @@ The final redirected URL may be content-negotiated:
 ### Multi-tenancy
 
 For projects wishing to service a number of catalogs out of a single
-resolver, we recommend prefixing the local key portion of the CURIE with
-a catalog identifier as a path element. e.g.:
+resolver using a single CURIE prefix, we recommend prefixing the local
+key portion of the CURIE with a catalog identifier as a path
+element. e.g.:
 
 1. A researcher creates an entity in a table in catalog `7` with RID
-   value `1-X140`.
+   value `1-X140` and wishes to use `FOO` as the CURIE prefix for all
+   catalogs on this host.
 2. The *citation* CURIE is `FOO:7/1-X140`.
 3. The `FOO` prefix represents the multi-tenant ERMresolve instance
    `https://foo.example.com/id/`
-4. The CURIE is mapped to `https://foo.example.com/7/1-X140`.
+4. The citation CURIE is mapped to `https://foo.example.com/7/1-X140`.
 
-If desired, a community could also establish a separate
-catalog-specific CURIE prefix:
+Alternatively, a community could also establish a separate
+catalog-specific CURIE prefix to avoid embedding a catalog identifier
+in each CURIE:
 
-1. The *citation* CURIE is `SUBFOO:1-X140`.
-2. The `SUBFOO` prefix represents the catalog sub-space of the
+1. A researcher creates an entity in a table in catalog `7` with RID
+   value `1-X140` and wishes to use `SUBFOO` as the CURIE prefix for 
+   this specific catalog.
+2. The *citation* CURIE is `SUBFOO:1-X140`.
+3. The `SUBFOO` prefix represents the catalog sub-space of the
    ERMresolve instance `https://foo.example.com/id/7/`.
-3 This alternate CURIE is mapped to the same URL
-   `https://foo.example.com/7/1-X140`.
+4. This citation CURIE is mapped to `https://foo.example.com/7/1-X140`.
 
 With an appropriate configuration, ERMresolve will recognize the `7`
 in the URL as a catalog identifier and attempt resolution of the
@@ -149,6 +154,9 @@ following the more complex ERMrest installation procedure.
    # chmod og+rx ~ermresolve
    ```
 2. Configure `~/ermresolve.json` in daemon home directory, readable by Apache HTTPD.
+   - This is *optional* for customizing behavior. In the absence of a
+     configuration file, the service will use a default configuration
+     suitable for many multi-tenant scenarios.
    - See [example ERMresolve configuration](#example-ermresolve-configuration)
 3. Configure `mod_wsgi` to run ERMresolve.
    - See [example WSGI configuration](#example-wsgi-configuration)
@@ -191,7 +199,10 @@ The configuration file has a top-level object with several fields:
 - `"catalog"`: The default catalog to consult.
 - `"credential_file"`: The deriva-py formatted credential file needed
   to make authenticated requests to the configured ERMrest
-  `"server_url"` (optional, defaults to anonymous requests).
+  `"server_url"` (optional, defaults to anonymous requests). Such
+  authentication is useful to enable resolution in a catalog which is
+  normally hidden from anonymous users, or to allow legacy resolution
+  on tables where rows are not visible to anonymous users.
 - `"targets"`: An array of configuration objects, each with named
   fields (optional, defaults to `[{}]`):
    - `patterns`: one or more Python regular expressions with named
@@ -208,6 +219,59 @@ The configuration file has a top-level object with several fields:
    - `table`: legacy target table name (optional)
    - `column`: legacy target column name (optional)
 
+#### Default server URL
+
+If `server_url` is absent in the target, the service-wide setting is
+is chosen, and that in turn has a default defined in case it is not
+present in the top-level configuration document.
+
+#### Default configuration
+
+The service includes many default configuration choices. In the
+complete absence of a configuration file, these choices combine to
+provide a usable default behavior for many deployments. In general, a
+field can be omitted from the configuration file to select default
+behaviors. Thus, the following configuration documents are all
+equivalent.
+
+The simplest, empty document:
+
+    {}
+
+That is the same as this, filling all the absent top-level fields with
+their implicit defaults:
+
+    {
+	  "server_url": "http://myserver.example.com",
+	  "catalog": null,
+	  "credential_file": null,
+	  "targets": [{}]
+	}
+
+The preceding uses an empty target `{}` which can be further expanded
+to show the default patterns:
+
+    {
+	  "server_url": "http://myserver.example.com",
+	  "catalog": null,
+	  "credential_file": null,
+	  "targets": [
+	    {
+		  "patterns": [
+            "^(?P<KEY>[-0-9A-Za-z]+)$",
+            "^(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$"
+            "^(?P<CAT>[^/@]+)/(?P<KEY>[-0-9A-Za-z]+)$",
+            "^(?P<CAT>[^/@]+)/)(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$"
+		  ]
+		}
+	  ]
+	}
+
+This target uses the [new resolution method](#new-resolution-method)
+to efficiently resolve RIDs across all tables in the catalog, which
+will be configured by the `CAT` group in the last two patterns to
+recognize resolution URLs with embedded catalog identifiers.
+
 #### Catalog selection
 
 The configured catalog for a matching target is chosen in the
@@ -222,16 +286,19 @@ following order (first applicable source wins):
 #### Multiple targets and default target
 
 When the `targets` list includes multiple target configuration
-objects, the target tables represented by the configuration are
+objects, the targets represented by the configuration are
 searched in list order.
 
 Subsequent targets are searched only if the previous targets do not
 have a matching pattern or yield an inconclusive resolution, i.e. no
 match when probing that target in ERMrest.
 
-The default `targets` list `[{}]` enables the new resolution method,
-taking into consideration any default `server_url` and `catalog`
-settings in the service-wide configuration.
+The default `targets` list or `[{}]` enables the new resolution
+method, taking into consideration any default `server_url` and
+`catalog` settings in the service-wide
+configuration. See [default configuration](#default-configuration)
+for the equivalent fully concrete configuration content, which
+includes the default patterns.
 
 #### New resolution method
 
@@ -269,17 +336,9 @@ service will abort with diagnostics in the HTTPD error log.
 #### Default patterns
 
 If `patterns` is absent in the target object, a default pattern list
-is configured:
-
-    [
-      "^(?P<KEY>[-0-9A-Za-z]+)$",
-      "^(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$"
-      "^(?P<CAT>[^/@]+)/(?P<KEY>[-0-9A-Za-z]+)$",
-      "^(?P<CAT>[^/@]+)/)(?P<KEY>[-0-9A-Za-z]+)@(?P<SNAP>[-0-9A-Za-z]+)$"
-    ]
-
-This default set of patterns can match:
-- RIDs in an implicit, default catalog:
+is configured. See [default configuration](#default-configuration)
+for the concrete details. This default set of patterns can match:
+- RIDs in a default catalog (if configured):
    - Unversioned RIDs such as `1-X140`
    - Versioned RIDs such as `1-X140@2P4-RJ1W-WGHG`
 - RIDs in a specific catalog:
@@ -290,12 +349,6 @@ These defaults SHOULD be overridden with the `patterns` configuration
 field if it is not desirable to support versioned RIDs or embedded
 catalog identifiers.
 
-#### Default server URL
-
-If `server_url` is absent in the target, the service-wide setting is
-is chosen, and that in turn has a default defined in case it is not
-present in the top-level configuration document.
-
 ### Example ERMresolve Configuration
 
 This example JSON content demonstrates a resolver that can search for
@@ -303,7 +356,7 @@ any RID in the default catalog, search for RIDs in designated
 catalogs, and attempt a fallback resolution for a legacy identifier:
 
     {
-      "server_url": "http://foo.example.com",
+      "server_url": "http://myserver.example.com",
       "catalog": 1,
       "targets": [
         { },
