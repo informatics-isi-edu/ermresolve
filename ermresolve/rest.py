@@ -72,6 +72,7 @@ class Resolver (object):
             parts = target.match_parts(url_id_part)
             if parts:
                 syntax_matched = True
+                found = False
 
                 # see if this target is the right one in ERMrest
                 headers = {
@@ -90,17 +91,35 @@ class Resolver (object):
                 cookie = _credentials.get(target_server(target), {}).get('cookie', None)
                 if cookie is not None:
                     headers['Cookie'] = cookie
-                ermrest_url = (target.ermrest_url_template % parts)
-                with _session.get(ermrest_url, headers=headers) as resp:
-                    rows = None
-                    if resp.status_code == 200:
-                        rows = resp.json()
-                        if rows:
-                            assert len(rows) == 1, "resolution should never find multiple rows"
-                            if content_type == 'text/html':
-                                raise web.seeother(target.chaise_url_template % parts)
-                            else:
-                                raise web.seeother(ermrest_url)
+
+                if target.legacy:
+                    # legacy search of specific table via ermrest entity API
+                    ermrest_url = (target.ermrest_url_template % parts)
+                    with _session.get(ermrest_url, headers=headers) as resp:
+                        if resp.status_code == 200:
+                            found = resp.json()
+                            assert len(found) in [0, 1], "resolution should never find multiple rows"
+                else:
+                    # new resolution method via ermrest entity_rid API
+                    resolve_url = (target.ermrest_resolve_template % parts)
+                    with _session.get(resolve_url, headers=headers) as resp:
+                        if resp.status_code == 200:
+                            found = resp.json()
+                            parts.update({
+                                "schema": found["schema_name"],
+                                "table": found["table_name"],
+                                "column": "RID",
+                            })
+                            if "deleted_at" in found:
+                                # TODO: revisit if we get a Chaise tombstone app?
+                                continue
+
+                if found:
+                    # build response for either resolution method
+                    if content_type == 'text/html':
+                        raise web.seeother(target.chaise_url_template % parts)
+                    else:
+                        raise web.seeother(target.ermrest_url_template % parts)
 
                 #web.debug('ERMresolve %s did not produce a result' % ermrest_url)
 
