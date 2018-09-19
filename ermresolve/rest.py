@@ -109,6 +109,7 @@ class Resolver (object):
                                 "schema": found["schema_name"],
                                 "table": found["table_name"],
                                 "column": "RID",
+                                "key": found["RID"], # handle possible RID normalization!
                             })
                             if "deleted_at" in found:
                                 # TODO: revisit if we get a Chaise tombstone app?
