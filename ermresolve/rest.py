@@ -20,7 +20,6 @@ import json
 
 import web
 from webauthn2.util import negotiated_content_type
-from ermrest.exception.rest import *
 from .config import get_service_config
 
 import requests
@@ -53,6 +52,45 @@ def target_server(target):
         return target.server_url[len('http://'):]
     else:
         raise NotImplementedError("unsupported server_url %s" % target.server_url)
+
+class WebException (web.HTTPError):
+    def __init__(self, status, data=u'', headers={}, desc=u'%s'):
+        if isinstance(data, str):
+            data = data.decode('utf8')
+        if data is not None and desc is not None:
+            data = ('%s\n%s\n' % (status, desc)) % data
+            headers['Content-Type'] = 'text/plain'
+        try:
+            web.ctx.ermrest_request_trace(data)
+        except:
+            pass
+        web.HTTPError.__init__(self, status, headers=headers, data=data if data is not None else '')
+
+class BadRequest (WebException):
+    def __init__(self, data=u'', headers={}):
+        status = '400 Bad Request'
+        desc = u'The request is malformed. %s'
+        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
+
+class NotFound (WebException):
+    def __init__(self, data=u'', headers={}):
+        status = '404 Not Found'
+        desc = u'The requested %s could not be found.'
+        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
+
+class SeeOther (WebException):
+    status = '303 See Other'
+    def __init__(self, location, headers={'content-type': 'text/html'}):
+        ctype = headers.get('content-type', 'text/html')
+        headers['location'] = location
+        if ctype == 'text/html':
+            data = '<html><head><title>Redirect</title></head><body><a href="%(location)s">%(location)s</a></body></html>\n'
+        elif ctype == 'text/uri-list':
+            data = '%(location)s\n'
+        else:
+            raise NotImplementedError('See Other content-type %s' % ctype)
+        data % headers
+        WebException.__init__(self, self.status, headers=headers, data=data, desc=None)
 
 class Resolver (object):
     """Implements ERMresolve REST API as a web.py request handler.
@@ -118,9 +156,9 @@ class Resolver (object):
                 if found:
                     # build response for either resolution method
                     if content_type == 'text/html':
-                        raise web.seeother(target.chaise_url_template % parts)
+                        raise SeeOther(target.chaise_url_template % parts)
                     else:
-                        raise web.seeother(target.ermrest_url_template % parts)
+                        raise SeeOther(target.ermrest_url_template % parts, {'content-type': 'text/uri-list'})
 
                 #web.debug('ERMresolve %s did not produce a result' % ermrest_url)
 
