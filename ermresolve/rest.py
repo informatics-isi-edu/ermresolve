@@ -89,7 +89,7 @@ class SeeOther (WebException):
             data = '%(location)s\n'
         else:
             raise NotImplementedError('See Other content-type %s' % ctype)
-        data % headers
+        data = data % headers
         WebException.__init__(self, self.status, headers=headers, data=data, desc=None)
 
 class Resolver (object):
