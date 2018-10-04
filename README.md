@@ -180,7 +180,12 @@ SE-Linux contexts might vary slightly:
 NOTE: for those uncomfortable with enabling `httpd_execmem`, the
 alternative is to only use plain `http://` URLs in the configured
 targets. Unfortunately, the Python `requests` library seems to require
-`httpd_execmem` when using HTTPS protocol to talk to ERMrest.
+`httpd_execmem` when using HTTPS protocol to talk to ERMrest. However,
+using `http://` URLs creates problems with the Safari browser if your
+server subsequently issues redirects to bounce clients to an
+equivalent `https:` URL; Safari will drop the necessary
+fragment-identifier portion of Chaise URLs and fail to redirect to a
+working Chaise record page!
 
 If you enable authenticated requests, the named `"credential_file"` in
 the configuration must also be readable by the service, e.g. by adding
@@ -194,8 +199,11 @@ another related policy:
 The configuration file has a top-level object with several fields:
 
 - `"server_url"`: The base server URL to use when talking to ERMrest
-  (optional, defaults to `http://fqdn` for the local host's
-  fully-qualified domain name).
+  (optional, defaults to `https://fqdn` for the local host's
+  fully-qualified domain name). NOTE: this SHOULD be an `https:` URL
+  or you may have problems redirecting Safari browsers to Chaise apps!
+  See further discussion
+  in [Working with SE-Linux](#working-with-se-linux).
 - `"catalog"`: The default catalog to consult.
 - `"credential_file"`: The deriva-py formatted credential file needed
   to make authenticated requests to the configured ERMrest
@@ -242,7 +250,7 @@ That is the same as this, filling all the absent top-level fields with
 their implicit defaults:
 
     {
-	  "server_url": "http://myserver.example.com",
+	  "server_url": "https://myserver.example.com",
 	  "catalog": null,
 	  "credential_file": null,
 	  "targets": [{}]
@@ -252,7 +260,7 @@ The preceding uses an empty target `{}` which can be further expanded
 to show the default patterns:
 
     {
-	  "server_url": "http://myserver.example.com",
+	  "server_url": "https://myserver.example.com",
 	  "catalog": null,
 	  "credential_file": null,
 	  "targets": [
@@ -356,7 +364,7 @@ any RID in the default catalog, search for RIDs in designated
 catalogs, and attempt a fallback resolution for a legacy identifier:
 
     {
-      "server_url": "http://myserver.example.com",
+      "server_url": "https://myserver.example.com",
       "catalog": 1,
       "targets": [
         { },

@@ -131,7 +131,7 @@ class ResolverConfig (object):
         self.targets = []
         if type(doc) is not dict:
             raise TypeError('ERMresolve configuration MUST be an object.')
-        self.server_url = doc.get('server_url', 'http://' + platform.node())
+        self.server_url = doc.get('server_url', 'https://' + platform.node())
         self.credential_file = doc.get('credential_file')
         self.catalog = doc.get('catalog')
         targets_doc = doc.get('targets', [{}])
