@@ -19,7 +19,7 @@ from setuptools import setup
 setup(
     name='ermresolve',
     description='ERM citation resolver for ERMrest',
-    version='20181003.1',
+    version='20181003.2',
     zip_safe=False, # we need to unpack for mod_wsgi to find ermrest.wsgi 
     packages=[
         'ermresolve',

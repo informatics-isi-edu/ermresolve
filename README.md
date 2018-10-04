@@ -382,8 +382,7 @@ a custom search on a legacy table.
     WSGISocketPrefix /var/run/wsgi/wsgi
     
     <Location /id>
-       Satisfy any
-       Allow from all
+       Request all granted
        WSGIProcessGroup ermresolve
     </Location>
 
