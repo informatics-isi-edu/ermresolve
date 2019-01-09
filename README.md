@@ -383,9 +383,12 @@ a custom search on a legacy table.
 
 ### Example WSGI Configuration
 
+This configuration would work on Fedora using python3-mod_wsgi for a
+Python 3.7 based service stack:
+
     WSGIPythonOptimize 1
     WSGIDaemonProcess ermresolve processes=4 threads=4 user=ermresolve maximum-requests=2000
-    WSGIScriptAlias /project1 /usr/lib/python2.7/site-packages/ermresolve/ermresolve.wsgi
+    WSGIScriptAlias /id /usr/local/lib/python3.7/site-packages/ermresolve/ermresolve.wsgi
     
     WSGISocketPrefix /var/run/wsgi/wsgi
     

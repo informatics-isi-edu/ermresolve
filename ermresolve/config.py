@@ -1,6 +1,6 @@
 
 # 
-# Copyright 2018 University of Southern California
+# Copyright 2018-2019 University of Southern California
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,12 +23,12 @@ import re
 import urllib
 
 def urlquote(s, safe=''):
-    return urllib.quote(s)
+    return urllib.parse.quote(s)
 
 class ResolverTarget (object):
     def __init__(self, patterns, server_url, catalog, schema, table, column):
         """Construct target given 5-tuple of target configuration."""
-        if type(server_url) not in [str, unicode]:
+        if not isinstance(server_url, str):
             raise TypeError('ERMresolve target "server_url" field MUST be a string.')
 
         self.server_url = server_url
@@ -37,7 +37,7 @@ class ResolverTarget (object):
             raise TypeError('ERMresolve target "patterns" field MUST be a list.')
         
         def compile(s):
-            if type(s) not in [str, unicode]:
+            if not isinstance(s, str):
                 raise TypeError('Each ERMresolve target pattern MUST be a string.')
             try:
                 return re.compile(s)
@@ -47,8 +47,8 @@ class ResolverTarget (object):
         self.patterns = [ compile(s) for s in patterns ]
 
         def validate(name, s, extra_types=[]):
-            if type(s) not in [str, unicode] + extra_types:
-                raise TypeError('Target "%s" type %s not supported.' % (name, type(s)))
+            if not isinstance(s, (str,) + tuple(extra_types)):
+                raise TypeError('Target "%s" type %s not supported.' % (name, type(s).__name__))
             return s
 
         self.catalog = validate('catalog', catalog, [int, type(None)])
