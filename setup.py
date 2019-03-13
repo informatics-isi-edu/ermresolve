@@ -1,5 +1,5 @@
 #
-# Copyright 2018 University of Southern California
+# Copyright 2018-2019 University of Southern California
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ from setuptools import setup
 setup(
     name='ermresolve',
     description='ERM citation resolver for ERMrest',
-    version='20181003.4',
+    version='20190109.0',
     zip_safe=False, # we need to unpack for mod_wsgi to find ermrest.wsgi 
     packages=[
         'ermresolve',

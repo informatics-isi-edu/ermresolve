@@ -1,6 +1,6 @@
 
 # 
-# Copyright 2018 University of Southern California
+# Copyright 2018-2019 University of Southern California
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,12 +19,12 @@ import urllib
 import json
 
 import web
-from webauthn2.util import negotiated_content_type
-from .config import get_service_config
-
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+from webauthn2.util import negotiated_content_type
+
+from .config import get_service_config
 
 _config = get_service_config()
 
@@ -55,8 +55,6 @@ def target_server(target):
 
 class WebException (web.HTTPError):
     def __init__(self, status, data=u'', headers={}, desc=u'%s'):
-        if isinstance(data, str):
-            data = data.decode('utf8')
         if data is not None and desc is not None:
             data = ('%s\n%s\n' % (status, desc)) % data
             headers['Content-Type'] = 'text/plain'
@@ -115,7 +113,7 @@ class Resolver (object):
                 # see if this target is the right one in ERMrest
                 headers = {
                     "Accept": "application/json",
-                    "Deriva-Client-Context": urllib.quote(
+                    "Deriva-Client-Context": urllib.parse.quote(
                         json.dumps(
                             {
                                 "cid": "ermresolve",
@@ -149,9 +147,12 @@ class Resolver (object):
                                 "column": "RID",
                                 "key": found["RID"], # handle possible RID normalization!
                             })
-                            if "deleted_at" in found:
+                            if "last_visible_snaptime" in found:
                                 # TODO: revisit if we get a Chaise tombstone app?
-                                continue
+                                parts["catalog"] = "%s@%s" % (
+                                    parts["catalog_bare"],
+                                    found["last_visible_snaptime"],
+                                )
 
                 if found:
                     # build response for either resolution method
