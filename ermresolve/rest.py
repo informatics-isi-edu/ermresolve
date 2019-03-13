@@ -147,9 +147,12 @@ class Resolver (object):
                                 "column": "RID",
                                 "key": found["RID"], # handle possible RID normalization!
                             })
-                            if "deleted_at" in found:
+                            if "last_visible_snaptime" in found:
                                 # TODO: revisit if we get a Chaise tombstone app?
-                                continue
+                                parts["catalog"] = "%s@%s" % (
+                                    parts["catalog_bare"],
+                                    found["last_visible_snaptime"],
+                                )
 
                 if found:
                     # build response for either resolution method

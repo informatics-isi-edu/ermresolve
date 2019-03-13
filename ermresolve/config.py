@@ -92,6 +92,7 @@ class ResolverTarget (object):
                     return
                 return {
                     "server_url": self.server_url,
+                    "catalog_bare": g.get("CAT", self.catalog),
                     "catalog": "%s%s" % (
                         g.get("CAT", self.catalog),
                         ('@' + g['SNAP']) if "SNAP" in g else ''
