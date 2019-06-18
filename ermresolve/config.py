@@ -21,6 +21,7 @@ import os.path
 import json
 import re
 import urllib
+import web
 
 def urlquote(s, safe=''):
     return urllib.parse.quote(s)
@@ -28,7 +29,7 @@ def urlquote(s, safe=''):
 class ResolverTarget (object):
     def __init__(self, patterns, server_url, catalog, schema, table, column):
         """Construct target given 5-tuple of target configuration."""
-        if not isinstance(server_url, str):
+        if server_url and not isinstance(server_url, str):
             raise TypeError('ERMresolve target "server_url" field MUST be a string.')
 
         self.server_url = server_url
@@ -91,7 +92,7 @@ class ResolverTarget (object):
                     # don't allow a match if target catalog is not determined
                     return
                 return {
-                    "server_url": self.server_url,
+                    "server_url": self.get_server_url(),
                     "catalog_bare": g.get("CAT", self.catalog),
                     "catalog": "%s%s" % (
                         g.get("CAT", self.catalog),
@@ -106,6 +107,11 @@ class ResolverTarget (object):
     ermrest_resolve_template = "%(server_url)s/ermrest/catalog/%(catalog)s/entity_rid/%(key)s"
     ermrest_url_template = "%(server_url)s/ermrest/catalog/%(catalog)s/entity/%(schema)s:%(table)s/%(column)s=%(key)s?limit=2"
     chaise_url_template = "%(server_url)s/chaise/record/#%(catalog)s/%(schema)s:%(table)s/%(column)s=%(key)s"
+
+    def get_server_url(self):
+        if self.server_url is None:
+            self.server_url = "%(prot)s://%(host)s" % dict(prot=web.ctx.protocol, host=web.ctx.host)
+        return self.server_url
 
     @classmethod
     def from_config_element(cls, element, server_url, catalog):
@@ -132,7 +138,9 @@ class ResolverConfig (object):
         self.targets = []
         if type(doc) is not dict:
             raise TypeError('ERMresolve configuration MUST be an object.')
-        self.server_url = doc.get('server_url', 'https://' + platform.node())
+        self.server_url = doc.get('server_url')
+        if self.server_url is None and not doc.get("use_virtual_host"):
+            self.server_url = 'https://' + platform.node()
         self.credential_file = doc.get('credential_file')
         self.catalog = doc.get('catalog')
         targets_doc = doc.get('targets', [{}])

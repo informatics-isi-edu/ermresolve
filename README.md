@@ -204,6 +204,9 @@ The configuration file has a top-level object with several fields:
   or you may have problems redirecting Safari browsers to Chaise apps!
   See further discussion
   in [Working with SE-Linux](#working-with-se-linux).
+- `"use_virtual_host"` if set, then the systemwide default server_url
+  will use the same protcol and hostname as the http request (each virtual
+  host should use a separate process group if this option is set).
 - `"catalog"`: The default catalog to consult.
 - `"credential_file"`: The deriva-py formatted credential file needed
   to make authenticated requests to the configured ERMrest
@@ -230,7 +233,7 @@ The configuration file has a top-level object with several fields:
 #### Default server URL
 
 If `server_url` is absent in the target, the service-wide setting is
-is chosen, and that in turn has a default defined in case it is not
+chosen, and that in turn has a default defined in case it is not
 present in the top-level configuration document.
 
 #### Default configuration
