@@ -110,7 +110,7 @@ class ResolverTarget (object):
 
     def get_server_url(self):
         if self.server_url is None:
-            self.server_url = "{prot}://{host}".format(prot=web.ctx.protocol, host=web.ctx.host)
+            self.server_url = "%(prot)s://%(host)s" % dict(prot=web.ctx.protocol, host=web.ctx.host)
         return self.server_url
 
     @classmethod
