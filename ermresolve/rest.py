@@ -1,6 +1,6 @@
 
 # 
-# Copyright 2018-2019 University of Southern California
+# Copyright 2018-2023 University of Southern California
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,12 +17,15 @@
 
 import urllib
 import json
-
-import web
+from collections import OrderedDict
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-from webauthn2.util import negotiated_content_type
+import werkzeug.exceptions
+import flask
+import flask.views
+
+from webauthn2.util import deriva_debug, RestException
 
 from .config import get_service_config
 
@@ -53,55 +56,66 @@ def target_server(target):
     else:
         raise NotImplementedError("unsupported server_url %s" % target.server_url)
 
-class WebException (web.HTTPError):
-    def __init__(self, status, data=u'', headers={}, desc=u'%s'):
-        if data is not None and desc is not None:
-            data = ('%s\n%s\n' % (status, desc)) % data
-            headers['Content-Type'] = 'text/plain'
-        try:
-            web.ctx.ermrest_request_trace(data)
-        except:
-            pass
-        web.HTTPError.__init__(self, status, headers=headers, data=data if data is not None else '')
-
-class BadRequest (WebException):
-    def __init__(self, data=u'', headers={}):
-        status = '400 Bad Request'
-        desc = u'The request is malformed. %s'
-        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
-
-class NotFound (WebException):
-    def __init__(self, data=u'', headers={}):
-        status = '404 Not Found'
-        desc = u'The requested %s could not be found.'
-        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
-
-class SeeOther (WebException):
-    status = '303 See Other'
-    def __init__(self, location, headers={'content-type': 'text/html'}):
-        ctype = headers.get('content-type', 'text/html')
-        headers['location'] = location
-        if ctype == 'text/html':
-            data = '<html><head><title>Redirect</title></head><body><a href="%(location)s">%(location)s</a></body></html>\n'
-        elif ctype == 'text/uri-list':
-            data = '%(location)s\n'
+class ErmresolvException (RestException):
+    def __init__(self, message=None, headers={}):
+        if message is None:
+            message = self.description
         else:
-            raise NotImplementedError('See Other content-type %s' % ctype)
-        data = data % headers
-        WebException.__init__(self, self.status, headers=headers, data=data, desc=None)
+            message = '%s Detail: %s' % (self.description, message)
+        super(ErmresolvException, self).__init__(message, headers=headers)
 
-class Resolver (object):
-    """Implements ERMresolve REST API as a web.py request handler.
+class NotFound (ErmresolvException):
+    code = 404
+    description = 'Resource not found.'
+
+class BadRequest (ErmresolvException):
+    code = 400
+    description = 'Request malformed.'
+
+class SeeOther (ErmresolvException):
+    code = 303
+    description = 'See Other'
+    title = 'Redirect'
+
+    # the ancestor RestException class handled content-negotiation
+    # but we want different options for the redirect responses...
+    response_templates = OrderedDict([
+        ("text/html", '<html><head><title>%(title)s</title><body><a href="%(message)s">%(message)s</a></body></html>'),
+        ("text/plain", 'See Other: %(message)s'),
+        ("text/uri-list", '%(message)s'),
+    ])
+
+    def __init__(self, location, headers={}):
+        headers = dict(headers)
+        headers['location'] = location
+        super(SeeOther, self).__init__(location, headers=headers)
+        # set just the location URL as the whole message
+        # otherwise we get extra text formatting from the ancestor classes
+        self.description = location
+
+app = flask.Flask('ermresolv')
+
+@app.errorhandler(Exception)
+def error_handler(ev):
+    if isinstance(ev, (RestException, werkzeug.exceptions.HTTPException)):
+        # TODO: add logging here if desired?
+        pass
+    else:
+        et, ev2, tb = sys.exc_info()
+        deriva_debug('Got unhandled exception in ermresolv: %s\n' % (ev,))
+        deriva_debug(''.join(traceback.format_exception(et, ev2, tb)))
+
+    # TODO: investigate and rewrite any unhandled exceptions
+    # otherwise flask will turn them into 500 Internal Server Error
+    return ev
+
+class Resolver (flask.views.MethodView):
+    """Implements ERMresolve REST API request handler.
 
     """
-    def GET(self, url_id_part):
+    def get(self, url_id_part):
         """Resolve url_id_part and redirect client to current GUI or data URL."""
         syntax_matched = False
-
-        content_type = negotiated_content_type(
-            ['text/csv', 'application/json', 'application/x-json-stream', 'text/html'],
-            'application/json'
-        )
 
         # search in order for syntax match
         for target in _config.targets:
@@ -117,7 +131,7 @@ class Resolver (object):
                         json.dumps(
                             {
                                 "cid": "ermresolve",
-                                "pid": web.ctx.env['UNIQUE_ID'],
+                                "pid": flask.request.environ['UNIQUE_ID'],
                             },
                             separators=(',', ':')
                         ),
@@ -156,16 +170,19 @@ class Resolver (object):
 
                 if found:
                     # build response for either resolution method
-                    if content_type == 'text/html':
-                        raise SeeOther(target.chaise_url_template % parts)
-                    else:
-                        raise SeeOther(target.ermrest_url_template % parts, {'content-type': 'text/uri-list'})
+                    raise SeeOther(target.chaise_url_template % parts)
 
-                #web.debug('ERMresolve %s did not produce a result' % ermrest_url)
+                #deriva_debug('ERMresolve %s did not produce a result' % ermrest_url)
 
         if syntax_matched:
-            raise NotFound(web.ctx.env['REQUEST_URI'])
+            raise NotFound(flask.request.environ['REQUEST_URI'])
         else:
             raise BadRequest('Key "%s" is not a recognized ID format.' % url_id_part)
 
+        # always raise an exception above, never return a normal flask response!
+
+# setup flask route
 urls = ('/(.*)', Resolver)
+_Resolver_view = app.route(
+    '/<path:url_id_part>'
+)(Resolver.as_view('Resolver'))
