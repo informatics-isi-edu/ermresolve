@@ -1,6 +1,6 @@
 
 # 
-# Copyright 2018-2019 University of Southern California
+# Copyright 2018-2023 University of Southern California
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import os.path
 import json
 import re
 import urllib
-import web
+import flask
 
 def urlquote(s, safe=''):
     return urllib.parse.quote(s)
@@ -110,7 +110,8 @@ class ResolverTarget (object):
 
     def get_server_url(self):
         if self.server_url is None:
-            self.server_url = "%(prot)s://%(host)s" % dict(prot=web.ctx.protocol, host=web.ctx.host)
+            environ = flask.request.environ
+            self.server_url = "%(prot)s://%(host)s" % dict(prot=environ['wsgi.url_scheme'], host=environ.get('HTTP_HOST', environ['SERVER_NAME']))
         return self.server_url
 
     @classmethod

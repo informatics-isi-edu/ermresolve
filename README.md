@@ -112,7 +112,7 @@ techniques.
 - webauthn2
 - Apache HTTPD
 - mod_wsgi
-- web.py lightweight web framework
+- flask web framework
 - Chaise web UI at `/chaise/` path on server
 
 ### Planning the Deployment
@@ -396,7 +396,7 @@ Python 3.7 based service stack:
     WSGISocketPrefix /var/run/wsgi/wsgi
     
     <Location /id>
-       Request all granted
+       Require all granted
        WSGIProcessGroup ermresolve
     </Location>
 

@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2019 University of Southern California
+# Copyright 2018-2023 University of Southern California
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ setup(
     scripts=[
         
     ],
-    requires=['web.py', 'ermrest'],
+    requires=['flask', 'ermrest'],
     maintainer_email='support@misd.isi.edu',
     license='Apache License, Version 2.0',
     classifiers=[
