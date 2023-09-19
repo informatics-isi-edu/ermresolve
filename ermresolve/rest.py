@@ -94,6 +94,24 @@ class SeeOther (ErmresolvException):
         self.description = location
 
 app = flask.Flask('ermresolv')
+def raw_path_app(app_orig, raw_uri_env_key='REQUEST_URI'):
+    """Allow routes to distinguish raw reserved chars from escaped ones.
+    :param app_orig: The WSGI app to wrap with middleware.
+    :param raw_path_env_key: The key to lookup the raw request URI in the WSGI environment.
+    """
+    def app(environ, start_response):
+        parts = urllib.parse.urlparse(environ[raw_uri_env_key])
+        path_info = parts.path
+        script_name = environ['SCRIPT_NAME']
+        if path_info.startswith(script_name):
+            path_info = path_info[len(script_name):]
+        if parts.params:
+            path_info = '%s;%s' % (path_info, parts.params)
+        environ['PATH_INFO'] = path_info
+        return app_orig(environ, start_response)
+    return app
+
+app.wsgi_app = raw_path_app(app.wsgi_app)
 
 @app.errorhandler(Exception)
 def error_handler(ev):
