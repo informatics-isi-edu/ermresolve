@@ -19,16 +19,15 @@ from setuptools import setup
 setup(
     name='ermresolve',
     description='ERM citation resolver for ERMrest',
-    version='20190109.0',
+    version='20230926.0',
     zip_safe=False, # we need to unpack for mod_wsgi to find ermrest.wsgi 
     packages=[
         'ermresolve',
     ],
     package_data={
-        'ermresolve': ['*.wsgi', 'ermresolve_config.json', 'wsgi_ermresolve.conf'],
+        'ermresolve': ['*.wsgi']
     },
     scripts=[
-        
     ],
     requires=['flask', 'ermrest'],
     maintainer_email='support@misd.isi.edu',
