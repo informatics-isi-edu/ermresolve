@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+import sys
+import traceback
 import urllib
 import json
 from collections import OrderedDict
